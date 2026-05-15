@@ -146,7 +146,7 @@ flowchart LR
   UI[Next.js Hookline UI] -->|x-api-key| AppApi[API Gateway HTTP API<br/>/api/*]
   AppApi --> AppLambda[App API Lambda]
 
-  UI -->|POST /hooks/{endpointId}| IngestApi[API Gateway HTTP API<br/>/hooks/*]
+  UI -->|"POST /hooks/{endpointId}"| IngestApi[API Gateway HTTP API<br/>/hooks/*]
   IngestApi --> IngestLambda[Ingest Lambda]
 
   AppLambda --> Events[(DynamoDB<br/>events)]
@@ -162,6 +162,7 @@ flowchart LR
 
   AppLambda --> Logs[(CloudWatch Logs)]
   IngestLambda --> Logs
+
 ```
 
 ### Request Flow
