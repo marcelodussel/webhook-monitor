@@ -1,6 +1,6 @@
 import { Boxes } from "lucide-react";
 import { getLandingDecisions } from "./content";
-import { LANDING_GRID_CLASS } from "./constants";
+import { LANDING_GRID_CLASS, LANDING_SECTION_PAD } from "./constants";
 import { SectionHeader } from "./section-header";
 
 export function LandingDecisions() {
@@ -10,7 +10,7 @@ export function LandingDecisions() {
       <div
         className={`pointer-events-none absolute inset-0 ${LANDING_GRID_CLASS} opacity-30 [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_70%)]`}
       />
-      <div className="relative mx-auto max-w-7xl px-6">
+      <div className={`relative mx-auto max-w-7xl ${LANDING_SECTION_PAD}`}>
         <SectionHeader
           eyebrow="ENGINEERING / 03"
           title="Architecture tradeoffs, made explicit."

@@ -1,5 +1,6 @@
 import type { ComponentType, SVGProps } from "react";
 import { Database, Eye, Globe, Network, Zap } from "lucide-react";
+import { LANDING_SECTION_PAD } from "./constants";
 import { SectionHeader } from "./section-header";
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
@@ -15,7 +16,7 @@ const nodes: { label: string; sub: string; icon: Icon }[] = [
 export function LandingArchitecture() {
   return (
     <section id="architecture" className="relative border-b border-border/60 py-24">
-      <div className="mx-auto max-w-7xl px-6">
+      <div className={`mx-auto max-w-7xl ${LANDING_SECTION_PAD}`}>
         <SectionHeader
           eyebrow="ARCHITECTURE / 01"
           title="Event-driven, serverless by design."

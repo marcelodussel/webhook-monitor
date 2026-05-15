@@ -1,10 +1,11 @@
 import { landingFeatures } from "./content";
+import { LANDING_SECTION_PAD } from "./constants";
 import { SectionHeader } from "./section-header";
 
 export function LandingFeatures() {
   return (
     <section id="features" className="border-b border-border/60 py-24">
-      <div className="mx-auto max-w-7xl px-6">
+      <div className={`mx-auto max-w-7xl ${LANDING_SECTION_PAD}`}>
         <SectionHeader
           eyebrow="CAPABILITIES / 02"
           title="Designed as a self-hosted platform you can deploy and manage."

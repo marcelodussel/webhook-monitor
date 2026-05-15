@@ -1,11 +1,12 @@
 import { Cloud } from "lucide-react";
 import { stackGroups } from "./content";
+import { LANDING_SECTION_PAD } from "./constants";
 import { SectionHeader } from "./section-header";
 
 export function LandingTechStack() {
   return (
     <section id="stack" className="border-b border-border/60 py-24">
-      <div className="mx-auto max-w-7xl px-6">
+      <div className={`mx-auto max-w-7xl ${LANDING_SECTION_PAD}`}>
         <SectionHeader eyebrow="STACK / 07" title="Built on AWS primitives and modern technologies." />
         <div className="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr]">
           {stackGroups.map((g) => (

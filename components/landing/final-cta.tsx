@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Code2 } from "lucide-react";
 import { GITHUB_REPO_URL } from "@/lib/config";
-import { LANDING_GRID_CLASS } from "./constants";
+import { LANDING_GRID_CLASS, LANDING_SECTION_PAD } from "./constants";
 
 export function LandingFinalCta() {
   return (
@@ -16,7 +16,7 @@ export function LandingFinalCta() {
             "radial-gradient(40% 60% at 50% 50%, color-mix(in oklab, var(--primary) 14%, transparent), transparent 70%)",
         }}
       />
-      <div className="relative mx-auto max-w-3xl px-6 text-center">
+      <div className={`relative mx-auto max-w-3xl text-center ${LANDING_SECTION_PAD}`}>
         <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-5xl">
           Cloud-native webhook infrastructure built for <span className="text-primary">observability</span>.
         </h2>

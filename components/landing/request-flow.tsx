@@ -1,11 +1,12 @@
 import { getRequestFlowLines } from "./content";
+import { LANDING_SECTION_PAD } from "./constants";
 import { SectionHeader } from "./section-header";
 
 export function LandingRequestFlow() {
   const flow = getRequestFlowLines();
   return (
     <section className="border-b border-border/60 py-24">
-      <div className="mx-auto max-w-7xl px-6">
+      <div className={`mx-auto max-w-7xl ${LANDING_SECTION_PAD}`}>
         <SectionHeader eyebrow="LIFECYCLE / 04" title="A request, end to end." />
         <ol className="relative mt-12">
           <span className="absolute bottom-2 left-[15px] top-2 w-px bg-gradient-to-b from-primary/60 via-border to-transparent" />

@@ -2,12 +2,13 @@ import Link from "next/link";
 import { GitBranch } from "lucide-react";
 import { samplePayload } from "./content";
 import { prettyJson } from "./pretty-json";
+import { LANDING_SECTION_PAD } from "./constants";
 import { SectionHeader } from "./section-header";
 
 export function LandingEventPreview() {
   return (
     <section className="border-b border-border/60 py-24">
-      <div className="mx-auto max-w-7xl px-6">
+      <div className={`mx-auto max-w-7xl ${LANDING_SECTION_PAD}`}>
         <SectionHeader
           eyebrow="INSPECTOR / 06"
           title="Inspect stored webhook events end to end."

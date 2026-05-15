@@ -12,7 +12,7 @@ import { LandingFooter } from "./footer";
 
 export function LandingPage() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen overflow-x-clip bg-background text-foreground">
       <LandingNav />
       <LandingHero />
       <LandingArchitecture />
