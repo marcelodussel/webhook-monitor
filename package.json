@@ -14,7 +14,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test --test-isolation=process tests/*.test.ts",
+    "test": "tsx --test tests/*.test.ts",
     "typecheck:lambdas": "pnpm --filter \"./lambdas/*\" run typecheck"
   },
   "dependencies": {
