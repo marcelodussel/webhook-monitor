@@ -1,3 +1,7 @@
+packages:
+  - "."
+  - "lambdas/*"
+
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver

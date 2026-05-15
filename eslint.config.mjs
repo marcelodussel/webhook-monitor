@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // SAM build artifacts
+    "infra/.aws-sam/**",
+    // Study snippets (not Next.js); deps live under lambdas/app-api/
+    "docs/**/*.ts",
   ]),
 ]);
 

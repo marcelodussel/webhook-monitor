@@ -1,0 +1,314 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Hookline Day 1 — HTTP API ingest, DynamoDB events, S3 raw payloads
+
+Parameters:
+  ResourcePrefix:
+    Type: String
+    Default: whm-dev
+    Description: Prefix for resource names (DynamoDB table, S3 bucket fragment)
+
+  FrontendOrigins:
+    Type: CommaDelimitedList
+    Default: "http://localhost:3000"
+    Description: Allowed browser origins for CORS (comma-separated). Add your Vercel domain(s) here.
+
+  AppApiKey:
+    Type: String
+    Default: replace-me-with-a-long-random-string
+    NoEcho: true
+    Description: Static API key for portfolio app API (frontend sends x-api-key)
+
+  GeminiApiKey:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: Optional Google AI Studio API key for Gemini /api/events/{eventId}/explain (leave blank to disable)
+
+  GeminiModel:
+    Type: String
+    Default: gemini-2.0-flash
+    Description: Gemini model id for generateContent (override if Google renames the model)
+
+  AiExplainMaxPerDay:
+    Type: Number
+    Default: 100
+    Description: Global max AI explain calls per UTC day when GeminiApiKey is set (raise if needed)
+
+  ReplayAllowedHosts:
+    Type: String
+    Default: ""
+    Description: Optional comma-separated allowlist for replay destination hostnames (empty = allow any public host)
+
+Globals:
+  Function:
+    Timeout: 10
+    MemorySize: 256
+    Runtime: nodejs22.x
+    Architectures:
+      - x86_64
+    LoggingConfig:
+      LogFormat: JSON
+      ApplicationLogLevel: INFO
+      SystemLogLevel: WARN
+
+Resources:
+  IngestApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowMethods:
+          - "*"
+        AllowHeaders:
+          - "content-type"
+        AllowOrigins: !Ref FrontendOrigins
+
+  AppApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowMethods:
+          - "*"
+        AllowHeaders:
+          - "content-type"
+          - "x-api-key"
+        AllowOrigins: !Ref FrontendOrigins
+
+  EventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      TableName: !Sub "${ResourcePrefix}-events"
+      AttributeDefinitions:
+        - AttributeName: endpointId
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+        - AttributeName: eventId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: endpointId
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: EventIdIndex
+          KeySchema:
+            - AttributeName: eventId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  EndpointsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      TableName: !Sub "${ResourcePrefix}-endpoints"
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+
+  PayloadsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${ResourcePrefix}-payloads-${AWS::AccountId}-${AWS::Region}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  AiUsageTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      TableName: !Sub "${ResourcePrefix}-ai-usage"
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  IngestFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      CodeUri: ../lambdas/ingest/
+      Handler: index.handler
+      Environment:
+        Variables:
+          EVENTS_TABLE: !Ref EventsTable
+          ENDPOINTS_TABLE: !Ref EndpointsTable
+          PAYLOADS_BUCKET: !Ref PayloadsBucket
+          LOG_LEVEL: INFO
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Sid: DynamoPutEvent
+              Effect: Allow
+              Action:
+                - dynamodb:PutItem
+              Resource: !GetAtt EventsTable.Arn
+            - Sid: DynamoGetEndpoint
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+              Resource: !GetAtt EndpointsTable.Arn
+            - Sid: S3PutPayload
+              Effect: Allow
+              Action:
+                - s3:PutObject
+              Resource: !Sub "${PayloadsBucket.Arn}/endpoints/*"
+      Events:
+        IngestRoute:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref IngestApi
+            Path: /hooks/{endpointId}
+            Method: ANY
+
+  AppApiFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      CodeUri: ../lambdas/app-api/
+      Handler: index.handler
+      Timeout: 15
+      Environment:
+        Variables:
+          EVENTS_TABLE: !Ref EventsTable
+          ENDPOINTS_TABLE: !Ref EndpointsTable
+          PAYLOADS_BUCKET: !Ref PayloadsBucket
+          APP_API_KEY: !Ref AppApiKey
+          GEMINI_API_KEY: !Ref GeminiApiKey
+          GEMINI_MODEL: !Ref GeminiModel
+          AI_USAGE_TABLE: !Ref AiUsageTable
+          AI_EXPLAIN_MAX_PER_DAY: !Sub "${AiExplainMaxPerDay}"
+          REPLAY_ALLOWED_HOSTS: !Ref ReplayAllowedHosts
+          INGEST_BASE_URL: !Sub "https://${IngestApi}.execute-api.${AWS::Region}.amazonaws.com/hooks"
+          LOG_LEVEL: INFO
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Sid: DynamoQueryEvents
+              Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource:
+                - !GetAtt EventsTable.Arn
+                - !Sub "${EventsTable.Arn}/index/*"
+            - Sid: DynamoUpdateEvents
+              Effect: Allow
+              Action:
+                - dynamodb:UpdateItem
+              Resource: !GetAtt EventsTable.Arn
+            - Sid: DynamoBatchDeleteEvents
+              Effect: Allow
+              Action:
+                - dynamodb:BatchWriteItem
+              Resource: !GetAtt EventsTable.Arn
+            - Sid: DynamoReadWriteEndpoints
+              Effect: Allow
+              Action:
+                - dynamodb:Scan
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:DeleteItem
+              Resource: !GetAtt EndpointsTable.Arn
+            - Sid: S3GetPayload
+              Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource: !Sub "${PayloadsBucket.Arn}/endpoints/*"
+            - Sid: S3DeletePayload
+              Effect: Allow
+              Action:
+                - s3:DeleteObject
+              Resource: !Sub "${PayloadsBucket.Arn}/endpoints/*"
+            - Sid: DynamoAiUsage
+              Effect: Allow
+              Action:
+                - dynamodb:UpdateItem
+              Resource: !GetAtt AiUsageTable.Arn
+      Events:
+        GetEndpoints:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref AppApi
+            Path: /api/endpoints
+            Method: GET
+        PostEndpoints:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref AppApi
+            Path: /api/endpoints
+            Method: POST
+        DeleteEndpoint:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref AppApi
+            Path: /api/endpoints/{endpointId}
+            Method: DELETE
+        GetEndpointEvents:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref AppApi
+            Path: /api/endpoints/{endpointId}/events
+            Method: GET
+        GetEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref AppApi
+            Path: /api/events/{eventId}
+            Method: GET
+        ReplayEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref AppApi
+            Path: /api/events/{eventId}/replay
+            Method: POST
+        ExplainEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref AppApi
+            Path: /api/events/{eventId}/explain
+            Method: POST
+
+Outputs:
+  IngestApiId:
+    Description: API Gateway HTTP API ID
+    Value: !Ref IngestApi
+  IngestBaseUrl:
+    Description: Base URL for ingest (append /{endpointId})
+    Value: !Sub "https://${IngestApi}.execute-api.${AWS::Region}.amazonaws.com/hooks"
+  AppApiId:
+    Description: App API Gateway HTTP API ID
+    Value: !Ref AppApi
+  AppApiBaseUrl:
+    Description: Base URL for app API (set as NEXT_PUBLIC_API_BASE_URL)
+    Value: !Sub "https://${AppApi}.execute-api.${AWS::Region}.amazonaws.com"
+  EventsTableName:
+    Description: DynamoDB table for webhook event metadata
+    Value: !Ref EventsTable
+  EndpointsTableName:
+    Description: DynamoDB table for webhook endpoints
+    Value: !Ref EndpointsTable
+  PayloadsBucketName:
+    Description: S3 bucket for raw webhook bodies
+    Value: !Ref PayloadsBucket
+  AiUsageTableName:
+    Description: DynamoDB table for AI explain daily usage counters
+    Value: !Ref AiUsageTable

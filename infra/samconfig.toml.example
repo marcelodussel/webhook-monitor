@@ -1,0 +1,18 @@
+# Copy to samconfig.toml (gitignored) after `sam deploy --guided`, or merge into your own config.
+# Run builds from the infra/ directory: `cd infra && sam build && sam deploy`
+
+version = 0.1
+
+[default.global.parameters]
+stack_name = "hookline-ingest-dev"
+region = "us-east-1"
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.deploy.parameters]
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+resolve_s3 = true
+# parameter_overrides = "ResourcePrefix=whm-dev AppApiKey=your-long-random-string GeminiApiKey=your-google-ai-studio-key GeminiModel=gemini-2.0-flash AiExplainMaxPerDay=100"
