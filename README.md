@@ -33,7 +33,7 @@ custom backends.
 - Optionally explain webhook payloads or failures with **Gemini** behind a
   DynamoDB-backed daily usage cap.
 
-## Try the live demo (~10 seconds)
+## Try the live demo 
 
 No clone or AWS setup required to explore the project.
 
@@ -180,58 +180,50 @@ flowchart LR
 
 ## Engineering Decisions
 
-### DynamoDB for metadata, S3 for raw payloads
+- **DynamoDB for metadata, S3 for raw payloads**  
+  Webhook bodies can be large, binary, or provider-specific. Hookline stores
+  queryable event fields in DynamoDB while archiving the original raw body in S3.
+  This keeps the dashboard access pattern fast without forcing large payloads into
+  the primary database record.
 
-Webhook bodies can be large, binary, or provider-specific. Hookline stores
-queryable event fields in DynamoDB while archiving the original raw body in S3.
-This keeps the dashboard access pattern fast without forcing large payloads into
-the primary database record.
+- **Token-protected ingest URLs**  
+  Each endpoint can include an ingest token in the generated URL. The ingest Lambda
+  checks the token before accepting writes, which keeps public ingest URLs from
+  becoming open write endpoints.
 
-### Token-protected ingest URLs
+- **Replay with header hygiene**  
+  Replay sends the stored payload back out as a `POST`, but intentionally strips
+  sensitive and hop-by-hop headers such as `authorization`, `cookie`, `host`,
+  `content-length`, forwarding headers, and AWS request headers. The SAM template
+  also supports an optional replay host allowlist for public demos.
 
-Each endpoint can include an ingest token in the generated URL. The ingest Lambda
-checks the token before accepting writes, which keeps public ingest URLs from
-becoming open write endpoints.
+- **Public-demo preview mode**  
+  If the app API returns `401` or `403`, the dashboard falls back to a seeded
+  preview dataset for endpoints and events. This keeps the public UI useful without
+  exposing the real API key, while write actions remain disabled until a valid key
+  is configured.
 
-### Replay with header hygiene
+- **Bounded AI explain**  
+  AI explain is optional and disabled by default. When `GeminiApiKey` is set, the
+  app API redacts sensitive headers, truncates the payload sent to the model, and
+  atomically reserves a UTC daily usage slot in DynamoDB before calling Gemini.
+  If the daily cap is exceeded, the endpoint returns `429` instead of making an
+  external model call.
 
-Replay sends the stored payload back out as a `POST`, but intentionally strips
-sensitive and hop-by-hop headers such as `authorization`, `cookie`, `host`,
-`content-length`, forwarding headers, and AWS request headers. The SAM template
-also supports an optional replay host allowlist for public demos.
+- **Endpoint cleanup path**  
+  Deleting an endpoint removes the endpoint row, deletes its event records in
+  DynamoDB batches, and removes the matching S3 payload objects. The cleanup path
+  handles paginated event queries and retries unprocessed DynamoDB batch writes.
 
-### Public-demo preview mode
+- **Structured operational logs**  
+  Both Lambdas emit structured JSON logs to CloudWatch with fields such as
+  `eventId`, `endpointId`, `durationMs`, status, and failure messages. The goal is
+  to make the system observable instead of only visually demoable.
 
-If the app API returns `401` or `403`, the dashboard falls back to a seeded
-preview dataset for endpoints and events. This keeps the public UI useful without
-exposing the real API key, while write actions remain disabled until a valid key
-is configured.
-
-### Bounded AI explain
-
-AI explain is optional and disabled by default. When `GeminiApiKey` is set, the
-app API redacts sensitive headers, truncates the payload sent to the model, and
-atomically reserves a UTC daily usage slot in DynamoDB before calling Gemini.
-If the daily cap is exceeded, the endpoint returns `429` instead of making an
-external model call.
-
-### Endpoint cleanup path
-
-Deleting an endpoint removes the endpoint row, deletes its event records in
-DynamoDB batches, and removes the matching S3 payload objects. The cleanup path
-handles paginated event queries and retries unprocessed DynamoDB batch writes.
-
-### Structured operational logs
-
-Both Lambdas emit structured JSON logs to CloudWatch with fields such as
-`eventId`, `endpointId`, `durationMs`, status, and failure messages. The goal is
-to make the system observable instead of only visually demoable.
-
-### Infrastructure as code
-
-The AWS backend is defined with AWS SAM, including HTTP APIs, Lambda functions,
-DynamoDB tables, S3 payload storage, IAM permissions, CORS settings, and runtime
-configuration.
+- **Infrastructure as code**  
+  The AWS backend is defined with AWS SAM, including HTTP APIs, Lambda functions,
+  DynamoDB tables, S3 payload storage, IAM permissions, CORS settings, and runtime
+  configuration.
 
 ## Tech Stack
 
